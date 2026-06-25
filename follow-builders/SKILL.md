@@ -18,6 +18,25 @@ digestible summaries of what they're saying.
 
 Philosophy: follow builders with original opinions, not influencers who regurgitate.
 
+## Persistence Rule
+
+Every generated digest is a local artifact first. After composing the final Markdown
+digest, write it to the repository under `reports/YYYY-MM-DD.md`, commit it, and
+push the current branch to its upstream remote before any optional chat, Telegram,
+or email delivery.
+
+Use the bundled script for this so the path, commit, and push behavior stay
+consistent:
+
+```bash
+echo '<your digest markdown>' > /tmp/fb-digest.md
+cd ${CLAUDE_SKILL_DIR}/scripts && node save-and-push.js --file /tmp/fb-digest.md
+```
+
+If the push fails, tell the user the report file path and the git error. Do not
+claim the daily run is complete until the digest is saved locally and either pushed
+or the push failure is clearly reported.
+
 ## Detecting Platform
 
 Before doing anything, detect which platform you're running on by running:
@@ -338,7 +357,21 @@ Read `config.language` from the JSON:
 
 **Follow this setting exactly. Do NOT mix languages.**
 
-### Step 6: Deliver
+### Step 6: Save and push
+
+Persist the exact final digest Markdown before delivery:
+
+```bash
+echo '<your digest text>' > /tmp/fb-digest.md
+cd ${CLAUDE_SKILL_DIR}/scripts && node save-and-push.js --file /tmp/fb-digest.md 2>/dev/null
+```
+
+The script writes to `reports/YYYY-MM-DD.md`, creates a git commit if the digest
+changed, and pushes the current branch. If it reports that nothing changed, continue
+without creating a duplicate commit. If it errors, show the local digest and the
+error; do not silently skip persistence.
+
+### Step 7: Deliver
 
 Read `config.delivery.method` from the JSON:
 
@@ -408,4 +441,5 @@ After any configuration change, confirm what you changed.
 When the user invokes `/ai` or asks for their digest manually:
 1. Skip cron check — run the digest workflow immediately
 2. Use the same fetch → remix → deliver flow as the cron run
-3. Tell the user you're fetching fresh content (it takes a minute or two)
+3. Save and push the generated digest before delivery
+4. Tell the user you're fetching fresh content (it takes a minute or two)

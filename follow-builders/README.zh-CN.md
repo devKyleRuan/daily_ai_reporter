@@ -40,6 +40,19 @@ Agent 会询问你：
 
 信息源列表（建造者和播客）由中心化统一管理和更新——你无需做任何操作即可获得最新的信息源。
 
+## 本地归档与 Git 推送
+
+每次生成摘要后，都会先保存再投递：
+
+```bash
+cd follow-builders/scripts
+node save-and-push.js --file /path/to/digest.md
+```
+
+脚本会把摘要写入仓库根目录的 `reports/YYYY-MM-DD.md`，内容有变化时自动
+commit，并把当前分支 push 到上游远端。这样即使聊天、Telegram 或邮件投递
+后续失败，每天的报告也已经落地并可在 GitHub 审阅。
+
 ## 自定义摘要风格
 
 Skill 使用纯文本 prompt 文件来控制内容的摘要方式。你可以通过两种方式自定义：

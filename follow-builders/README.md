@@ -45,6 +45,20 @@ Your delivery preferences are configurable through conversation. Just tell your 
 The source list (builders and podcasts) is curated centrally and updates
 automatically — you always get the latest sources without doing anything.
 
+## Local Archive and Git Push
+
+Every generated digest is saved before delivery:
+
+```bash
+cd follow-builders/scripts
+node save-and-push.js --file /path/to/digest.md
+```
+
+The script writes the digest to `reports/YYYY-MM-DD.md` at the repository root,
+commits the report when it changed, and pushes the current branch to its upstream
+remote. This makes each daily report reviewable in GitHub even if chat, Telegram,
+or email delivery fails later.
+
 ## Customizing the Summaries
 
 The skill uses plain-English prompt files to control how content is summarized.
@@ -121,4 +135,3 @@ See [examples/sample-digest.md](examples/sample-digest.md) for what the output l
 ## License
 
 MIT
-

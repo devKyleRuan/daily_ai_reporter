@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "fetch": "node fetch-content.js",
+    "save-and-push": "node save-and-push.js",
     "test": "node --test test-fetch.js"
   },
   "dependencies": {
