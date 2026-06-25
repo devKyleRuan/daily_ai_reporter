@@ -45,8 +45,8 @@ which openclaw 2>/dev/null && echo "PLATFORM=openclaw" || echo "PLATFORM=other"
 ```
 
 - **OpenClaw** (`PLATFORM=openclaw`): Persistent agent with built-in messaging channels.
-  Delivery is automatic via OpenClaw's channel system. No need to ask about delivery method.
-  Cron uses `openclaw cron add`.
+  Deliver the saved daily digest with `deliver.js`, configured as `delivery.method:
+  "openclaw"`. Cron uses `openclaw cron add`.
 
 - **Other** (Claude Code, Cursor, etc.): Non-persistent agent. Terminal closes = agent stops.
   For automatic delivery, users MUST set up Telegram or Email. Without it, digests
@@ -87,9 +87,19 @@ For weekly, also ask which day.
 
 ### Step 3: Delivery Method
 
-**If OpenClaw:** SKIP this step entirely. OpenClaw already delivers messages to the
-user's Telegram/Discord/WhatsApp/etc. Set `delivery.method` to `"stdout"` in config
-and move on.
+**If OpenClaw:** Configure OpenClaw delivery instead of asking for Telegram bot
+tokens or email keys. Ask which OpenClaw channel and target should receive the
+digest. For Telegram, prefer a chat id or known username from:
+
+```bash
+openclaw directory peers list --channel telegram
+openclaw directory groups list --channel telegram
+```
+
+Set `delivery.method` to `"openclaw"`, `delivery.channel` to `"telegram"` unless
+the user chose another OpenClaw channel, and `delivery.target` to the selected
+recipient. If the target is unknown, ask the user to message the connected bot or
+choose a known group/channel before enabling automatic delivery.
 
 **If non-persistent agent (Claude Code, Cursor, etc.):**
 
@@ -144,8 +154,8 @@ Ask: "What language do you prefer for your digest?"
 
 ### Step 5: API Keys
 
-**If the user chose "stdout" or "right here" delivery:** No API keys needed at all!
-All content is fetched centrally. Skip to Step 6.
+**If the user chose OpenClaw, "stdout", or "right here" delivery:** No API keys
+needed at all! All content is fetched centrally. Skip to Step 6.
 
 **If the user chose Telegram or Email delivery:**
 Create the .env file with only the delivery key they need:
@@ -198,7 +208,9 @@ cat > ~/.follow-builders/config.json << 'CFGEOF'
   "deliveryTime": "<HH:MM>",
   "weeklyDay": "<day of week, only if weekly>",
   "delivery": {
-    "method": "<stdout, telegram, or email>",
+    "method": "<openclaw, stdout, telegram, or email>",
+    "channel": "<telegram, discord, slack, etc.; only if openclaw>",
+    "target": "<OpenClaw target/chat id/@username; only if openclaw>",
     "chatId": "<telegram chat ID, only if telegram>",
     "email": "<email address, only if email>"
   },
@@ -375,12 +387,14 @@ error; do not silently skip persistence.
 
 Read `config.delivery.method` from the JSON:
 
-**If "telegram" or "email":**
+**If "openclaw", "telegram", or "email":**
 ```bash
 echo '<your digest text>' > /tmp/fb-digest.txt
 cd ${CLAUDE_SKILL_DIR}/scripts && node deliver.js --file /tmp/fb-digest.txt 2>/dev/null
 ```
-If delivery fails, show the digest in the terminal as fallback.
+For OpenClaw delivery, `deliver.js` runs `openclaw message send --channel
+<delivery.channel> --target <delivery.target> --message <digest>`. If delivery
+fails, show the digest in the terminal as fallback and include the OpenClaw error.
 
 **If "stdout" (default):**
 Just output the digest directly.
@@ -406,6 +420,8 @@ open an issue at https://github.com/zarazhangrui/follow-builders."
 - "Switch to Chinese/English/bilingual" → Update `language` in config.json
 
 ### Delivery Changes
+- "Send with OpenClaw" / "Use OpenClaw" → Set `delivery.method` to `"openclaw"`, `delivery.channel` to the selected channel, and `delivery.target` to the selected target
+- "Change OpenClaw target" → Update `delivery.target`; use `openclaw directory peers/groups list --channel <channel>` when the target is unknown
 - "Switch to Telegram/email" → Update `delivery.method` in config.json, guide user through setup if needed
 - "Change my email" → Update `delivery.email` in config.json
 - "Send to this chat instead" → Set `delivery.method` to "stdout"

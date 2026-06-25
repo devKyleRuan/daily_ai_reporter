@@ -59,6 +59,35 @@ commits the report when it changed, and pushes the current branch to its upstrea
 remote. This makes each daily report reviewable in GitHub even if chat, Telegram,
 or email delivery fails later.
 
+## OpenClaw Delivery
+
+When OpenClaw is configured, daily reports can be sent through OpenClaw after the
+local archive and git push finish:
+
+```json
+{
+  "delivery": {
+    "method": "openclaw",
+    "channel": "telegram",
+    "target": "<chat_id_or_@username>"
+  }
+}
+```
+
+Find available Telegram targets with:
+
+```bash
+openclaw directory peers list --channel telegram
+openclaw directory groups list --channel telegram
+```
+
+Then deliver a saved digest with:
+
+```bash
+cd follow-builders/scripts
+node deliver.js --file /path/to/digest.md
+```
+
 ## Customizing the Summaries
 
 The skill uses plain-English prompt files to control how content is summarized.

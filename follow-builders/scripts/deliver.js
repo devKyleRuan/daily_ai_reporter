@@ -4,7 +4,7 @@
 // Follow Builders — Delivery Script
 // ============================================================================
 // Sends a digest to the user via their chosen delivery method.
-// Supports: Telegram bot, Email (via Resend), or stdout (default).
+// Supports: OpenClaw, Telegram bot, Email (via Resend), or stdout (default).
 //
 // Usage:
 //   echo "digest text" | node deliver.js
@@ -15,6 +15,8 @@
 // and API keys from ~/.follow-builders/.env
 //
 // Delivery methods:
+//   - "openclaw": sends via `openclaw message send`
+//                  (needs delivery.channel + delivery.target)
 //   - "telegram": sends via Telegram Bot API (needs TELEGRAM_BOT_TOKEN + chat ID)
 //   - "email": sends via Resend API (needs RESEND_API_KEY + email address)
 //   - "stdout" (default): just prints to terminal
@@ -24,6 +26,7 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { spawnSync } from 'child_process';
 import { config as loadEnv } from 'dotenv';
 
 // -- Constants ---------------------------------------------------------------
@@ -31,6 +34,27 @@ import { config as loadEnv } from 'dotenv';
 const USER_DIR = join(homedir(), '.follow-builders');
 const CONFIG_PATH = join(USER_DIR, 'config.json');
 const ENV_PATH = join(USER_DIR, '.env');
+
+// -- Text helpers ------------------------------------------------------------
+
+function splitForDelivery(text, maxLen = 3900) {
+  const chunks = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining);
+      break;
+    }
+
+    let splitAt = remaining.lastIndexOf('\n', maxLen);
+    if (splitAt < maxLen * 0.5) splitAt = maxLen;
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+
+  return chunks;
+}
 
 // -- Read input --------------------------------------------------------------
 
@@ -58,28 +82,69 @@ async function getDigestText() {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
+// -- OpenClaw Delivery -------------------------------------------------------
+
+function sendOpenClaw(text, delivery) {
+  const channel = delivery.channel || 'telegram';
+  const target = delivery.target || delivery.chatId;
+  const timeoutMs = Number(delivery.timeoutMs || 60000);
+  if (!target) {
+    throw new Error('delivery.target not found in config.json for OpenClaw delivery');
+  }
+
+  const chunks = channel === 'telegram' ? splitForDelivery(text) : [text];
+  const results = [];
+
+  for (let idx = 0; idx < chunks.length; idx += 1) {
+    const message = chunks.length > 1
+      ? `[${idx + 1}/${chunks.length}]\n${chunks[idx]}`
+      : chunks[idx];
+
+    const args = [
+      'message',
+      'send',
+      '--channel',
+      channel,
+      '--target',
+      target,
+      '--message',
+      message
+    ];
+
+    if (delivery.account) args.push('--account', delivery.account);
+    if (delivery.threadId) args.push('--thread-id', delivery.threadId);
+    if (delivery.silent) args.push('--silent');
+    if (delivery.dryRun) args.push('--dry-run');
+    args.push('--json');
+
+    const result = spawnSync('openclaw', args, {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      timeout: timeoutMs
+    });
+
+    if (result.error) {
+      throw new Error(`OpenClaw delivery failed: ${result.error.message}`);
+    }
+
+    if (result.status !== 0) {
+      const details = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      throw new Error(`OpenClaw delivery failed${details ? `:\n${details}` : ''}`);
+    }
+
+    if (result.stdout) results.push(result.stdout.trim());
+  }
+
+  return results;
+}
+
 // -- Telegram Delivery -------------------------------------------------------
 
 // Sends the digest via Telegram Bot API.
 // The user creates a bot via @BotFather and provides the token.
 // The chat ID is obtained when the user sends their first message to the bot.
 async function sendTelegram(text, botToken, chatId) {
-  // Telegram has a 4096 character limit per message.
-  // If the digest is longer, we split it into chunks.
-  const MAX_LEN = 4000;
-  const chunks = [];
-  let remaining = text;
-  while (remaining.length > 0) {
-    if (remaining.length <= MAX_LEN) {
-      chunks.push(remaining);
-      break;
-    }
-    // Try to split at a newline near the limit
-    let splitAt = remaining.lastIndexOf('\n', MAX_LEN);
-    if (splitAt < MAX_LEN * 0.5) splitAt = MAX_LEN;
-    chunks.push(remaining.slice(0, splitAt));
-    remaining = remaining.slice(splitAt);
-  }
+  const chunks = splitForDelivery(text, 4000);
 
   for (const chunk of chunks) {
     const res = await fetch(
@@ -170,6 +235,18 @@ async function main() {
 
   try {
     switch (delivery.method) {
+      case 'openclaw': {
+        sendOpenClaw(digestText, delivery);
+        console.log(JSON.stringify({
+          status: 'ok',
+          method: 'openclaw',
+          channel: delivery.channel || 'telegram',
+          target: delivery.target || delivery.chatId,
+          message: 'Digest sent via OpenClaw'
+        }));
+        break;
+      }
+
       case 'telegram': {
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
         const chatId = delivery.chatId;

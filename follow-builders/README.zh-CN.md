@@ -53,6 +53,35 @@ node save-and-push.js --file /path/to/digest.md
 commit，并把当前分支 push 到上游远端。这样即使聊天、Telegram 或邮件投递
 后续失败，每天的报告也已经落地并可在 GitHub 审阅。
 
+## OpenClaw 投递
+
+如果已经配置 OpenClaw，每日日报会在本地归档和 git push 完成后，通过
+OpenClaw 发送：
+
+```json
+{
+  "delivery": {
+    "method": "openclaw",
+    "channel": "telegram",
+    "target": "<chat_id_or_@username>"
+  }
+}
+```
+
+可以用下面命令查找 Telegram 目标：
+
+```bash
+openclaw directory peers list --channel telegram
+openclaw directory groups list --channel telegram
+```
+
+然后发送已保存的 digest：
+
+```bash
+cd follow-builders/scripts
+node deliver.js --file /path/to/digest.md
+```
+
 ## 自定义摘要风格
 
 Skill 使用纯文本 prompt 文件来控制内容的摘要方式。你可以通过两种方式自定义：
